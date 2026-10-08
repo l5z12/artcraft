@@ -12,10 +12,14 @@ save/open with embedded assets and keyboard shortcuts. Native IPC is mocked in
 the browser; external requests are blocked. The scene browser check uses Vite
 source imports to exercise tab teardown and runs against development only.
 
-The Windows and macOS jobs check the desktop Rust library and run the identity,
-HTTP policy, and local scene file tests. SQLite uses the checked-in `.sqlx` cache
-with `SQLX_OFFLINE=true`. These jobs do not sign or publish builds; the existing
-release workflows handle publishing.
+The Linux (Ubuntu 24.04), Windows, and macOS jobs check the desktop Rust library
+and run the identity, HTTP policy, and local scene file tests. SQLite uses the
+checked-in `.sqlx` cache with `SQLX_OFFLINE=true`. These jobs do not sign or
+publish builds; the existing release workflows handle publishing.
+
+The Linux native job installs [Tauri's Linux prerequisites](https://v2.tauri.app/start/prerequisites/#linux),
+including GTK/WebKitGTK and AppIndicator development libraries, plus the
+CMake, Clang/LLVM, Perl, and NASM tools needed by the HTTP client's BoringSSL build.
 
 Run the frontend checks from `frontend/` with Node 24:
 
