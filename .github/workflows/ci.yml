@@ -95,8 +95,21 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install cmake strawberryperl pkgconfiglite llvm nasm --yes --no-progress
+          choco upgrade cmake --version=4.4.4 --yes --no-progress
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          choco install strawberryperl pkgconfiglite llvm nasm --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Select the freshly installed CMake by absolute path, even when
+          # cc-rs replaces PATH with the MSVC build environment.
+          $cmakeCommand = Join-Path $env:ProgramFiles 'CMake\bin\cmake.exe'
+          $capabilitiesJson = & $cmakeCommand -E capabilities
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $capabilities = $capabilitiesJson | ConvertFrom-Json
+          if ('Visual Studio 18 2026' -notin $capabilities.generators.name) {
+            throw "CMake $($capabilities.version.string) cannot build with Visual Studio 2026."
+          }
+          Write-Host "Using CMake $($capabilities.version.string) at $cmakeCommand"
+          "CMAKE=$cmakeCommand" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           @(
             'C:\Program Files\CMake\bin'
             'C:\Program Files\NASM'

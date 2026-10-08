@@ -21,6 +21,11 @@ The Linux native job installs [Tauri's Linux prerequisites](https://v2.tauri.app
 including GTK/WebKitGTK and AppIndicator development libraries, plus the
 CMake, Clang/LLVM, Perl, and NASM tools needed by the HTTP client's BoringSSL build.
 
+The Windows native job pins CMake 4.4.4 and passes the installed executable's
+absolute path to Cargo through `CMAKE`. This avoids an older CMake taking
+precedence on `PATH`. Setup checks for the Visual Studio 2026 generator before compilation;
+[that generator requires CMake 4.2 or later](https://cmake.org/cmake/help/latest/generator/Visual%20Studio%2018%202026.html).
+
 Run the frontend checks from `frontend/` with Node 24:
 
 ```sh
