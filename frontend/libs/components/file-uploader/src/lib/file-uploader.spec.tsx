@@ -1,12 +1,10 @@
-import { render } from '@testing-library/react';
+import { render, screen } from "@testing-library/react";
+import { FileUploader } from "./file-uploader";
 
-import FileUploader from './file-uploader';
-
-describe('FileUploader', () => {
-  
-  it('should render successfully', () => {
-    const { baseElement } = render(<FileUploader />);
-    expect(baseElement).toBeTruthy();
+describe("FileUploader", () => {
+  it("shows the supported upload type", () => {
+    render(<FileUploader files={[]} fileTypes={["PNG"]} handleChange={vi.fn()} />);
+    expect(screen.getByText("Upload a file")).toBeTruthy();
+    expect(screen.getByText("PNG supported")).toBeTruthy();
   });
-  
 });

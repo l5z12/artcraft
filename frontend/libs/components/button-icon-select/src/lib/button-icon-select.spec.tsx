@@ -1,12 +1,12 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from "@testing-library/react";
+import { SaveIcon } from "lucide-react";
+import { ButtonIconSelect } from "./button-icon-select";
 
-import ButtonIconSelect from './button-icon-select';
-
-describe('ButtonIconSelect', () => {
-  
-  it('should render successfully', () => {
-    const { baseElement } = render(<ButtonIconSelect />);
-    expect(baseElement).toBeTruthy();
+describe("ButtonIconSelect", () => {
+  it("reports the selected option", () => {
+    const onOptionChange = vi.fn();
+    render(<ButtonIconSelect options={[{ value: "save", text: "Save", icon: SaveIcon }]} onOptionChange={onOptionChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onOptionChange).toHaveBeenCalledWith("save");
   });
-  
 });

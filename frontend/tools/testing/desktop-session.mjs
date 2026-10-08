@@ -4,12 +4,13 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { installBrowserFixture } from "../performance/browser-fixture.mjs";
+import { launchTestBrowser, captureBrowserFailure } from "./browser-test-utils.mjs";
 
 const url = new URL(process.argv[2] || "http://127.0.0.1:5193");
 if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
   throw new Error("Use the local development or preview URL printed by the launcher.");
 }
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const browser = await launchTestBrowser(chromium);
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await context.addInitScript(installBrowserFixture);
@@ -116,6 +117,9 @@ try {
   }
   assert.deepEqual(errors, [], "Application runtime errors");
   console.log("PASS: optional login, signed-out/offline startup, billing opt-in persistence, support access, Accounts, Library, and image/video/audio pages.");
+} catch (error) {
+  await captureBrowserFailure(browser, "desktop-session");
+  throw error;
 } finally {
   await browser.close();
 }

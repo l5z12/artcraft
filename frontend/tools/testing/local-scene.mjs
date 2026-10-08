@@ -3,12 +3,13 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { installBrowserFixture } from "../performance/browser-fixture.mjs";
+import { launchTestBrowser, captureBrowserFailure } from "./browser-test-utils.mjs";
 
 const url = new URL(process.argv[2] || "http://127.0.0.1:6218");
 if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
   throw new Error("Use a local development URL.");
 }
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const browser = await launchTestBrowser(chromium);
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await context.addInitScript(installBrowserFixture);
@@ -129,6 +130,9 @@ try {
   await expect(page.getByRole("button", { name: "Local cube 3D Object", exact: true })).toBeVisible();
   assert.deepEqual(errors, [], "Application runtime errors");
   console.log("PASS: signed-out local save/open, embedded GLB/image, cameras/timeline, tab-cache round trip, Ctrl+S/O, cancellation and malformed-file recovery.");
+} catch (error) {
+  await captureBrowserFailure(browser, "local-scene");
+  throw error;
 } finally {
   await browser.close();
 }

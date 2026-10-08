@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "build:desktop": "cd apps/artcraft && node ../../node_modules/vite/bin/vite.js build",
+    "test:unit": "vitest run --config vitest.ci.config.ts",
+    "test:launcher": "node --test scripts/unix-dev.test.mjs",
+    "test:browser": "node tools/testing/run-browser-checks.mjs",
+    "test:browser:production": "node tools/testing/run-browser-checks.mjs --production",
     "test:desktop-session": "node tools/testing/desktop-session.mjs",
     "perf:desktop": "node tools/performance/run.mjs"
   },

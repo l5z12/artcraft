@@ -1,12 +1,9 @@
-import { render } from '@testing-library/react';
+import { render, screen } from "@testing-library/react";
+import { Badge } from "./badge";
 
-import Badge from './badge';
-
-describe('Badge', () => {
-  
-  it('should render successfully', () => {
-    const { baseElement } = render(<Badge />);
-    expect(baseElement).toBeTruthy();
+describe("Badge", () => {
+  it("renders its label", () => {
+    render(<Badge label="Local" />);
+    expect(screen.getByText("Local")).toBeTruthy();
   });
-  
 });

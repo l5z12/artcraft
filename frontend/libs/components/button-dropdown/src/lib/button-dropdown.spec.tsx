@@ -1,12 +1,9 @@
-import { render } from '@testing-library/react';
+import { render, screen } from "@testing-library/react";
+import { ButtonDropdown } from "./button-dropdown";
 
-import ButtonDropdown from './button-dropdown';
-
-describe('ButtonDropdown', () => {
-  
-  it('should render successfully', () => {
-    const { baseElement } = render(<ButtonDropdown />);
-    expect(baseElement).toBeTruthy();
+describe("ButtonDropdown", () => {
+  it("renders the file menu trigger", () => {
+    render(<ButtonDropdown label="File" options={[{ label: "Save" }]} />);
+    expect(screen.getByRole("button", { name: "File" })).toBeTruthy();
   });
-  
 });

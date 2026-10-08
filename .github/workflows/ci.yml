@@ -1,0 +1,109 @@
+name: Desktop CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, release, artcraft-release, artcraft-windows, artcraft-macos]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend tests and browser regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=6144
+      PLAYWRIGHT_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Unix launcher regressions
+        run: npm run test:launcher
+      - name: Build desktop frontend
+        run: npm run build:desktop
+      - name: Install browser
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Development browser regressions
+        run: npm run test:browser
+      - name: Production browser regressions
+        run: npm run test:browser:production
+      - name: Upload test reports and failure screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: frontend-test-results
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  native:
+    name: Native checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_BUILD_JOBS: "2"
+      SQLX_OFFLINE: "true"
+      # Match the Windows release's BoringSSL/static CRT configuration.
+      RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static' || '' }}
+      # Keep debug output and linker memory manageable on hosted runners.
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          save-if: ${{ github.event_name == 'push' }}
+      - name: Install Windows native dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install cmake strawberryperl pkgconfiglite llvm nasm --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @(
+            'C:\Program Files\CMake\bin'
+            'C:\Program Files\NASM'
+            'C:\Program Files\LLVM\bin'
+            'C:\Strawberry\perl\bin'
+            'C:\Strawberry\c\bin'
+          ) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          'LIBCLANG_PATH=C:\Program Files\LLVM\bin' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install macOS native dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake pkg-config llvm nasm
+          echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+      - name: Check desktop and native commands
+        run: cargo check --locked -p artcraft --lib
+      - name: Test desktop identity and HTTP policy
+        run: cargo test --locked -p artcraft_client_identity -p tauri-plugin-http --lib
+      - name: Test local scene files
+        run: cargo test --locked -p artcraft --lib core::commands::scene_files

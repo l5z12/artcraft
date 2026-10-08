@@ -59,6 +59,7 @@ node_modules/
 
 # Frontend build outputs
 frontend/apps/artcraft/bundle-report.html
+frontend/test-results/
 
 # Vim noise
 *.swo
