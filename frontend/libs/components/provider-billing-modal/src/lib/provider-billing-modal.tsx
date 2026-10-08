@@ -8,10 +8,12 @@ import { twMerge } from "tailwind-merge";
 
 interface ProviderBillingModalProps {
   isVideoPage?: boolean;
+  showArtcraftPlanSuggestions?: boolean;
 }
 
 export function ProviderBillingModal({
   isVideoPage = false,
+  showArtcraftPlanSuggestions = false,
 }: ProviderBillingModalProps) {
   const [showModal, setShowModal] = useState(false);
   const [provider, setProvider] = useState<GenerationProvider>(
@@ -47,11 +49,22 @@ export function ProviderBillingModal({
       block = <GenericProviderBillingBlock provider={provider} />;
       break;
     case GenerationProvider.Artcraft:
-      block = <ArtcraftBillingBlock isVideoPage={isVideoPage} />;
+      block = showArtcraftPlanSuggestions ? (
+        <ArtcraftBillingBlock isVideoPage={isVideoPage} />
+      ) : (
+        <div className="space-y-3 text-base-fg">
+          <h2 className="text-xl font-medium">ArtCraft credits unavailable</h2>
+          <p>
+            This generation needs ArtCraft credits. You can use another
+            configured provider, or manage ArtCraft services in Settings →
+            Plan &amp; Credits.
+          </p>
+        </div>
+      );
       break;
   }
 
-  const isArtcraft = provider === GenerationProvider.Artcraft;
+  const isArtcraft = provider === GenerationProvider.Artcraft && showArtcraftPlanSuggestions;
 
   return (
     <Modal

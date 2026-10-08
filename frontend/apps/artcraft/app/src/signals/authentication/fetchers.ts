@@ -44,9 +44,7 @@ export const login = async ({
     return;
   }
 
-  // technically user is login with the system now, HOWEVER,
-  // in storyteller studio, only having a sesison is not enough,
-  // we need session info and active subscription info as well
+  // Restore account details; subscriptions are optional.
   getUserInfoAndSubcriptions();
 
   window.location.href = "/"; // TODO(bt,2025-04-19): Once we have in-page routing, get rid of this.
@@ -83,9 +81,7 @@ export const signUp = async ({
     return response.errorMessage ?? "Unknown error";
   }
 
-  // technically user is login with the system now, HOWEVER,
-  // in storyteller studio, only having a sesison is not enough,
-  // we need session info and active subscription info as well
+  // Restore account details; subscriptions are optional.
   getUserInfoAndSubcriptions();
   return "";
 };
@@ -95,12 +91,12 @@ export const persistLogin = async () => {
   if (authentication.status.value !== AUTH_STATUS.INIT) {
     return;
   }
-  getUserInfoAndSubcriptions();
+  await getUserInfoAndSubcriptions();
 };
 
 // NB: Only for SyncStorytellerApiConfig.
 export const forceGetUserInfoAndSubcriptions = async () => {
-  getUserInfoAndSubcriptions();
+  await getUserInfoAndSubcriptions();
 };
 
 async function getUserInfoAndSubcriptions() {
@@ -117,31 +113,24 @@ async function getUserInfoAndSubcriptions() {
     return;
   }
 
-  if (sessionResponse.data && !sessionResponse.data.user.can_access_studio) {
-    updateAuthStatus(AUTH_STATUS.NO_ACCESS);
-    return;
-  }
-  
+  updateUserInfo(sessionResponse.data.user);
+  updateAuthStatus(AUTH_STATUS.LOGGED_IN);
+
   const userToken = sessionResponse.data.user.user_token;
   if (!!userToken) {
     gtagLogin(userToken);
   }
 
-  const billingApi = new BillingApi();
-  const subscriptionsResponse = await billingApi.ListActiveSubscriptions();
-  if (
-    !subscriptionsResponse.success ||
-    !subscriptionsResponse.data ||
-    !subscriptionsResponse.data.active_subscriptions
-  ) {
-    setLogoutStates();
-    return;
+  try {
+    const billingApi = new BillingApi();
+    const subscriptionsResponse = await billingApi.ListActiveSubscriptions();
+    // Ignore a response that arrived after logout or an account switch.
+    if (authentication.userInfo.value?.user_token !== userToken) return;
+    updateActiveSubscriptions({
+      maybe_loyalty_program: subscriptionsResponse.data?.maybe_loyalty_program,
+      active_subscriptions: subscriptionsResponse.data?.active_subscriptions || [],
+    });
+  } catch (error) {
+    console.error("Unable to refresh optional subscriptions", error);
   }
-
-  updateUserInfo(sessionResponse.data.user);
-  updateActiveSubscriptions({
-    maybe_loyalty_program: subscriptionsResponse.data.maybe_loyalty_program,
-    active_subscriptions: subscriptionsResponse.data.active_subscriptions || [],
-  });
-  updateAuthStatus(AUTH_STATUS.LOGGED_IN);
 }

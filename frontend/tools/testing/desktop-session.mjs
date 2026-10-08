@@ -25,7 +25,7 @@ try {
   const home = async () => {
     await page.goto(url.href);
     await expect(page.getByRole("heading", { name: "What will you craft today?" })).toBeVisible({ timeout: 60000 });
-    await expect(page.getByRole("button", { name: "42 Credits" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "ArtCraft account" })).toHaveCount(0);
   };
   const account = async () => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -35,6 +35,23 @@ try {
   };
 
   await home();
+  await expect(page.getByRole("button", { name: "Upgrade", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "42", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Plan & Credits", exact: true }).click();
+  await expect(page.getByText("Support ArtCraft", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Buy credits", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  await page.getByRole("switch", { name: "Show billing shortcuts", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await home();
+  await expect(page.getByRole("button", { name: "Upgrade", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "42", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("switch", { name: "Show billing shortcuts", exact: true }).uncheck();
+  await page.keyboard.press("Escape");
+  await home();
+  await expect(page.getByRole("button", { name: "Upgrade", exact: true })).toHaveCount(0);
   await account();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "My Library" }).click();
@@ -57,22 +74,55 @@ try {
   }
   await account();
   await page.getByRole("button", { name: "Log Out", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "ArtCraft account" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "ArtCraft account" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("button", { name: "Log In", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await page.getByPlaceholder("you@example.com or username").fill("session_smoke");
   await page.getByPlaceholder("Min. 8 characters").fill("fixture-password-only");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Welcome back" })).toHaveCount(0, { timeout: 10000 });
+  await expect(page.getByRole("dialog", { name: "ArtCraft account" })).toHaveCount(0, { timeout: 10000 });
   await account();
+  await page.keyboard.press("Escape");
+
+  // A fresh signed-out launch remains usable even if the session probe is offline.
+  for (const sessionOffline of [false, true]) {
+    const guestContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    await guestContext.addInitScript(installBrowserFixture);
+    await guestContext.addInitScript(installSessionFixture, { initiallyLoggedIn: false, sessionOffline });
+    await guestContext.route("**/*", (route) => {
+      const target = route.request().url();
+      return target.startsWith(url.origin) || target.startsWith("blob:")
+        ? route.continue() : route.abort();
+    });
+    const guest = await guestContext.newPage();
+    guest.on("pageerror", (error) => errors.push(error.message));
+    await guest.goto(url.href);
+    await expect(guest.getByRole("heading", { name: "What will you craft today?" })).toBeVisible({ timeout: 60000 });
+    await expect(guest.getByRole("dialog", { name: "ArtCraft account" })).toHaveCount(0);
+    await expect(guest.getByRole("button", { name: "Upgrade", exact: true })).toHaveCount(0);
+    await guest.getByRole("button", { name: "Create Image Generate AI images" }).click();
+    await expect(guest.getByRole("heading", { name: "Create Image", exact: true }).first()).toBeVisible();
+    await guestContext.close();
+  }
   assert.deepEqual(errors, [], "Application runtime errors");
-  console.log("PASS: credits, Accounts, Library media, deferred image/video/audio pages, logout gate, and sign-in agree.");
+  console.log("PASS: optional login, signed-out/offline startup, billing opt-in persistence, support access, Accounts, Library, and image/video/audio pages.");
 } finally {
   await browser.close();
 }
 
-function installSessionFixture() {
+function installSessionFixture({ initiallyLoggedIn = true, sessionOffline = false } = {}) {
   const invoke = window.__TAURI_INTERNALS__.invoke;
-  let loggedIn = true;
+  let loggedIn = initiallyLoggedIn;
   let nextResource = 0;
   const responses = new Map();
   const user = {
@@ -88,7 +138,10 @@ function installSessionFixture() {
     stats: { positive_rating_count: 0, bookmark_count: 0 },
   };
   window.__TAURI_INTERNALS__.invoke = async (command, args) => {
-    if (command === "storyteller_get_login_session_command") return loggedIn ? user : null;
+    if (command === "storyteller_get_login_session_command") {
+      if (sessionOffline) throw new Error("Offline session fixture");
+      return loggedIn ? user : null;
+    }
     if (command === "storyteller_password_login_command") { loggedIn = true; return user; }
     if (command === "storyteller_purge_credentials_command") { loggedIn = false; return; }
     if (command === "get_app_info_command") return { payload: { storyteller_host: "https://api.storyteller.ai" } };

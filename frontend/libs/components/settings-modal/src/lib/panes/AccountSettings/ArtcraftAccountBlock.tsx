@@ -16,7 +16,7 @@ export interface ArtcraftAccountBlockProps {
 export const ArtcraftAccountBlock = ({
   globalAccountLogoutCallback,
 }: ArtcraftAccountBlockProps) => {
-  const { triggerRecheck } = useLoginModalStore();
+  const { triggerRecheck, isOpen: isLoginOpen } = useLoginModalStore();
   const [artcraftSession, setArtcraftSession] = useState<UserInfo | undefined>(
     undefined
   );
@@ -25,23 +25,28 @@ export const ArtcraftAccountBlock = ({
     useState(false);
 
   useEffect(() => {
+    if (isLoginOpen) return;
+    let active = true;
     const fetchSession = async () => {
       setIsCheckingArtcraftSession(true);
       try {
         const result = await usersApi.GetSession();
+        if (!active) return;
         console.log(">>> result", result);
         setArtcraftSession(result?.data?.user);
         setIsLoggedIn(result?.data?.loggedIn || false);
       } catch (e) {
+        if (!active) return;
         console.error("Error fetching Artcraft session", e);
         setArtcraftSession(undefined);
         setIsLoggedIn(false);
       } finally {
-        setIsCheckingArtcraftSession(false);
+        if (active) setIsCheckingArtcraftSession(false);
       }
     };
     fetchSession();
-  }, []);
+    return () => { active = false; };
+  }, [isLoginOpen]);
 
   const handleArtcraftButton = async () => {
     if (isCheckingArtcraftSession) return;
@@ -53,8 +58,6 @@ export const ArtcraftAccountBlock = ({
       setIsCheckingArtcraftSession(false);
       globalAccountLogoutCallback(); // TODO: This resets the old global application state
 
-
-      triggerRecheck(); // Trigger modal to recheck session and potentially open
 
       await invoke("storyteller_purge_credentials_command");
 

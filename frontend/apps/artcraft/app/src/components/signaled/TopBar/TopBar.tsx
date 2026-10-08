@@ -39,7 +39,8 @@ import {
   GallerySelectToggle,
   GalleryViewToggle,
 } from "@storyteller/ui-generation-list";
-import { SettingsModal } from "@storyteller/ui-settings-modal";
+import { SettingsModal, useBillingPreferencesStore } from "@storyteller/ui-settings-modal";
+import { useLoginModalStore } from "@storyteller/ui-login-modal";
 import { Tooltip } from "@storyteller/ui-tooltip";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { APP_DESCRIPTORS, goToApp } from "~/config/appMenu";
@@ -183,8 +184,14 @@ export const TopBar = ({ pageName }: Props) => {
   useSignals();
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const showBillingShortcuts = useBillingPreferencesStore((s) => s.showBillingShortcuts);
+  const isLoginModalOpen = useLoginModalStore((s) => s.isOpen);
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("general");
+
+  useEffect(() => {
+    if (isLoginModalOpen) setIsSettingsModalOpen(false);
+  }, [isLoginModalOpen]);
 
   const { isDesktop, isMaximized, minimize, toggleMaximize, close } =
     useTauriWindowControls();
@@ -535,80 +542,82 @@ export const TopBar = ({ pageName }: Props) => {
               {(tabStore.activeTabId === "IMAGE" ||
                 tabStore.activeTabId === "VIDEO" ||
                 tabStore.activeTabId === "AUDIO") && <GalleryViewToggle />}
-              <PopoverMenu
-                position="bottom"
-                align="end"
-                triggerIcon={
-                  <CreditsCoinWithStatus iconStatus={creditsIconStatus} />
-                }
-                triggerLabel={
-                  <span className="whitespace-nowrap text-sm font-medium">
-                    {sumTotalCredits.toLocaleString()}
-                  </span>
-                }
-                buttonClassName="h-8 px-3 ps-2.5 bg-transparent hover:bg-white/10 border border-white/15 hover:border-white/30 shadow-none text-white/80 rounded-[3px] gap-1.5"
-                panelClassName="mt-2 bg-[#101014] border border-white/15 text-white rounded-[3px]"
-              >
-                {(close) => (
-                  <div className="w-72 p-3 text-white">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-sm font-medium text-white/70">
-                        Your credit balance
-                      </span>
-                      <button
-                        className="text-sm font-medium text-primary transition-colors hover:text-primary-300"
-                        onClick={() => {
-                          close();
-                          toggleCreditsModal();
-                        }}
-                      >
-                        Buy credits
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 text-3xl font-semibold tracking-tight text-white">
-                      <CoinsIcon className="text-xl text-primary" />
+              {showBillingShortcuts && (
+                <PopoverMenu
+                  position="bottom"
+                  align="end"
+                  triggerIcon={
+                    <CreditsCoinWithStatus iconStatus={creditsIconStatus} />
+                  }
+                  triggerLabel={
+                    <span className="whitespace-nowrap text-sm font-medium">
                       {sumTotalCredits.toLocaleString()}
-                    </div>
+                    </span>
+                  }
+                  buttonClassName="h-8 px-3 ps-2.5 bg-transparent hover:bg-white/10 border border-white/15 hover:border-white/30 shadow-none text-white/80 rounded-[3px] gap-1.5"
+                  panelClassName="mt-2 bg-[#101014] border border-white/15 text-white rounded-[3px]"
+                >
+                  {(close) => (
+                    <div className="w-72 p-3 text-white">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium text-white/70">
+                          Your credit balance
+                        </span>
+                        <button
+                          className="text-sm font-medium text-primary transition-colors hover:text-primary-300"
+                          onClick={() => {
+                            close();
+                            toggleCreditsModal();
+                          }}
+                        >
+                          Buy credits
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 text-3xl font-semibold tracking-tight text-white">
+                        <CoinsIcon className="text-xl text-primary" />
+                        {sumTotalCredits.toLocaleString()}
+                      </div>
 
-                    <button
-                      className="mt-2 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white/50 transition-colors hover:text-white"
-                      onClick={() => {
-                        close();
-                        useCostBreakdownModalStore.getState().openModal();
-                      }}
-                    >
-                      <CalculatorIcon />
-                      Cost calculator
-                    </button>
-
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        variant="secondary"
-                        className="h-9 grow"
+                      <button
+                        className="mt-2 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white/50 transition-colors hover:text-white"
                         onClick={() => {
                           close();
-                          handleOpenBillingSettings();
+                          useCostBreakdownModalStore.getState().openModal();
                         }}
                       >
-                        See details
-                      </Button>
-                      <Button
-                        variant="primary"
-                        className="h-9 grow"
-                        onClick={() => {
-                          close();
-                          toggleSubscriptionModal();
-                        }}
-                        icon={GemIcon}
-                      >
-                        Support
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </PopoverMenu>
+                        <CalculatorIcon />
+                        Cost calculator
+                      </button>
 
-              {!hasPaidPlan && (
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          variant="secondary"
+                          className="h-9 grow"
+                          onClick={() => {
+                            close();
+                            handleOpenBillingSettings();
+                          }}
+                        >
+                          See details
+                        </Button>
+                        <Button
+                          variant="primary"
+                          className="h-9 grow"
+                          onClick={() => {
+                            close();
+                            toggleSubscriptionModal();
+                          }}
+                          icon={GemIcon}
+                        >
+                          Support
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </PopoverMenu>
+              )}
+
+              {showBillingShortcuts && !hasPaidPlan && (
                 <Button
                   variant="primary"
                   icon={GemIcon}
@@ -715,7 +724,10 @@ export const TopBar = ({ pageName }: Props) => {
       />
 
       <ProviderSetupModal />
-      <ProviderBillingModal isVideoPage={tabStore.activeTabId === "VIDEO"} />
+      <ProviderBillingModal
+        isVideoPage={tabStore.activeTabId === "VIDEO"}
+        showArtcraftPlanSuggestions={showBillingShortcuts}
+      />
       <CreditsModal />
       <CostBreakdownModal activeTabId={tabStore.activeTabId} />
     </>

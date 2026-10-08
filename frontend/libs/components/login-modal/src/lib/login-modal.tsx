@@ -1,7 +1,7 @@
 import { Button } from "@storyteller/ui-button";
-import { Transition, TransitionChild } from "@headlessui/react";
+import { Modal } from "@storyteller/ui-modal";
 import { useState, useEffect, useRef } from "react";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, XIcon } from "lucide-react";
 import { DiscordIcon } from "@storyteller/icons";
 import type { UserInfo } from "@storyteller/api";
 import { DesktopLoginBridge } from "./DesktopLoginBridge";
@@ -43,7 +43,6 @@ export function LoginModal({
 }: LoginModalProps) {
   const { isOpen, recheckTrigger, closeModal } = useLoginModalStore();
   const [isLoading, setIsLoading] = useState(false);
-  const [_isLoggedInArtCraft, setIsLoggedInArtCraft] = useState(false);
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [errorMessage, setErrorMessage] = useState("");
   const [showDiscord, setShowDiscord] = useState(false);
@@ -57,30 +56,26 @@ export function LoginModal({
   const afterClose = useRef(onClose);
   afterClose.current = onClose;
 
-  // A stale startup/recheck response must never reopen the modal after login.
+  // Restore an existing session silently. Only explicit user actions open login.
   useEffect(() => {
     const generation = ++authGeneration.current;
     let active = true;
+    setIsLoading(false);
+    setIsSignUp(initialIsSignUp);
+    setErrorMessage("");
+    setShowDiscord(false);
+    setShowSuccess(false);
+    setIsChallengeActive(false);
+    setLoggedInUsername(null);
     getNativeLoginSession().then((user) => {
       if (!active || generation !== authGeneration.current) return;
       if (user) {
-        setIsLoggedInArtCraft(true);
         authSuccess.current?.(user);
         closeModal();
-      } else {
-        setIsLoading(false);
-        setIsSignUp(initialIsSignUp);
-        setErrorMessage("");
-        setShowDiscord(false);
-        setShowSuccess(false);
-        setLoggedInUsername(null);
-        setIsLoggedInArtCraft(false);
-        useLoginModalStore.getState().openModal();
       }
     }).catch((error) => {
       if (!active || generation !== authGeneration.current) return;
       setErrorMessage(isDesktopLoginError(error) ? error.message : "Unable to check your account. Please sign in again.");
-      useLoginModalStore.getState().openModal();
     });
     return () => { active = false; };
   }, [recheckTrigger, closeModal, initialIsSignUp]);
@@ -99,6 +94,8 @@ export function LoginModal({
   }, [loggedInUsername, isOpen, closeModal]);
 
   const handleClose = () => {
+    authGeneration.current += 1;
+    setIsChallengeActive(false);
     closeModal();
     onClose?.();
   };
@@ -112,7 +109,6 @@ export function LoginModal({
   const handleLoginSuccess = (user: UserInfo) => {
     authGeneration.current += 1;
     setIsLoading(false);
-    setIsLoggedInArtCraft(true);
     setIsChallengeActive(false);
     setLoggedInUsername(user.username);
     authSuccess.current?.(user);
@@ -133,7 +129,6 @@ export function LoginModal({
         : await passwordLogin(username || email, password);
       if (generation !== authGeneration.current) return;
       if (isSignUp) {
-        setIsLoggedInArtCraft(true);
         authSuccess.current?.(user);
         setShowDiscord(true);
       } else {
@@ -207,111 +202,99 @@ export function LoginModal({
   const inOnboarding = showDiscord || showSuccess;
 
   return (
-    <Transition appear show={isOpen} afterLeave={() => setLoggedInUsername(null)}>
-      <div className="fixed inset-0 z-[100]">
-        <TransitionChild
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      accessibleTitle="ArtCraft account"
+      childPadding={false}
+      showClose={false}
+      className={loggedInUsername !== null ? "max-w-md" : "max-w-lg lg:max-w-5xl"}
+      backdropClassName="bg-black/80"
+    >
+      <div
+        className={`relative flex w-full overflow-hidden border border-white/20 bg-[#1e1f22] text-white ${loggedInUsername !== null ? "" : "lg:min-h-[560px]"}`}
+      >
+        <button
+          type="button"
+          aria-label="Close login"
+          onClick={handleClose}
+          className="absolute right-3 top-3 z-10 rounded-[3px] p-2 text-white/60 hover:bg-white/10 hover:text-white"
         >
-          <div className="fixed inset-0 cursor-pointer bg-black/80" />
-        </TransitionChild>
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <TransitionChild
-            enter="ease-out duration-300"
-            enterFrom="opacity-0 scale-95"
-            enterTo="opacity-100 scale-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100 scale-100"
-            leaveTo="opacity-0 scale-95"
-          >
-            <div
-              className={`relative w-full ${loggedInUsername !== null ? "max-w-md" : "max-w-lg lg:max-w-5xl"}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div
-                className={`relative flex w-full overflow-hidden border border-white/20 bg-[#1e1f22] text-white ${loggedInUsername !== null ? "" : "lg:min-h-[560px]"}`}
-              >
-                {loggedInUsername !== null ? (
-                  <LoginSuccess username={loggedInUsername} />
-                ) : inOnboarding ? (
-                  renderOnboarding()
-                ) : (
-                  <>
-                    {/* ── Form pane ── (no dismiss control — login is required) */}
-                    <div className="relative flex w-full flex-col lg:w-1/2">
-                      <div className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 sm:py-12">
-                        <div className="w-full">
-                          <div className="mb-8 text-left">
-                            <img
-                              src="/resources/logo/artcraft-icon.png"
-                              alt="ArtCraft"
-                              className="pointer-events-none mb-8 h-8 w-auto select-none"
-                              draggable={false}
-                            />
-                            <h1 className="mb-3 text-balance font-display text-3xl leading-[1.05] tracking-tight sm:text-4xl">
-                              {isSignUp ? (
-                                "Create your account"
-                              ) : (
-                                <>
-                                  Welcome{" "}
-                                  <span className="font-serif-italic">back.</span>
-                                </>
-                              )}
-                            </h1>
-                            <p className="text-sm leading-relaxed text-white/60">
-                              {isSignUp
-                                ? "Sign up to start creating with ArtCraft"
-                                : "Log in to your creative workspace."}
-                            </p>
-                          </div>
+          <XIcon aria-hidden="true" className="h-5 w-5" />
+        </button>
+        {loggedInUsername !== null ? (
+          <LoginSuccess username={loggedInUsername} />
+        ) : inOnboarding ? (
+          renderOnboarding()
+        ) : (
+          <>
+            {/* ── Form pane ── */}
+            <div className="relative flex w-full flex-col lg:w-1/2">
+              <div className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 sm:py-12">
+                <div className="w-full">
+                  <div className="mb-8 text-left">
+                    <img
+                      src="/resources/logo/artcraft-icon.png"
+                      alt="ArtCraft"
+                      className="pointer-events-none mb-8 h-8 w-auto select-none"
+                      draggable={false}
+                    />
+                    <h1 className="mb-3 text-balance font-display text-3xl leading-[1.05] tracking-tight sm:text-4xl">
+                      {isSignUp ? (
+                        "Create your account"
+                      ) : (
+                        <>
+                          Welcome{" "}
+                          <span className="font-serif-italic">back.</span>
+                        </>
+                      )}
+                    </h1>
+                    <p className="text-sm leading-relaxed text-white/60">
+                      {isSignUp
+                        ? "Create an optional account to use ArtCraft's online services."
+                        : "Log in to access your ArtCraft online services."}
+                    </p>
+                  </div>
 
-                          {!isSignUp && <DesktopLoginBridge onActiveChange={setIsChallengeActive} onStart={() => { authGeneration.current += 1; }} onSuccess={handleLoginSuccess} />}
-                          {!isSignUp && !isChallengeActive && (
-                            <div className="mb-6 flex items-center gap-4 before:h-px before:flex-1 before:bg-white/15 after:h-px after:flex-1 after:bg-white/15">
-                              <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
-                                or
-                              </span>
-                            </div>
-                          )}
-                          {!isChallengeActive && <ArtCraftSignUp
-                            onSubmit={handleAuthSubmit}
-                            isSignUp={isSignUp}
-                            onToggleMode={() => setIsSignUp((prev) => !prev)}
-                            errorMessage={errorMessage}
-                            isLoading={isLoading}
-                          />}
-                        </div>
-                      </div>
-
-                      <div className="px-6 pb-6 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-white/25 sm:px-10">
-                        &copy; {new Date().getFullYear()} ArtCraft. All rights
-                        reserved.
-                      </div>
+                  {isOpen && !isSignUp && <DesktopLoginBridge key={recheckTrigger} onActiveChange={setIsChallengeActive} onStart={() => { authGeneration.current += 1; }} onSuccess={handleLoginSuccess} />}
+                  {!isSignUp && !isChallengeActive && (
+                    <div className="mb-6 flex items-center gap-4 before:h-px before:flex-1 before:bg-white/15 after:h-px after:flex-1 after:bg-white/15">
+                      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">
+                        or
+                      </span>
                     </div>
-
-                    {/* ── Showcase pane (desktop only) ── */}
-                    <div className="relative hidden border-l border-white/15 lg:block lg:w-1/2">
-                      <LoginShowcase videoUrl={videoUrl} />
-                    </div>
-                  </>
-                )}
+                  )}
+                  {!isChallengeActive && <ArtCraftSignUp
+                    onSubmit={handleAuthSubmit}
+                    isSignUp={isSignUp}
+                    onToggleMode={() => setIsSignUp((prev) => !prev)}
+                    errorMessage={errorMessage}
+                    isLoading={isLoading}
+                  />}
+                </div>
               </div>
-              {FRAME_CORNERS.map((corner) => (
-                <span
-                  key={corner}
-                  aria-hidden="true"
-                  className={`frame-corner-mark ${corner}`}
-                />
-              ))}
+
+              <div className="px-6 pb-6 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-white/25 sm:px-10">
+                &copy; {new Date().getFullYear()} ArtCraft. All rights
+                reserved.
+              </div>
             </div>
-          </TransitionChild>
-        </div>
+
+            {/* ── Showcase pane (desktop only) ── */}
+            <div className="relative hidden border-l border-white/15 lg:block lg:w-1/2">
+              <LoginShowcase videoUrl={videoUrl} />
+            </div>
+          </>
+        )}
       </div>
-    </Transition>
+      {FRAME_CORNERS.map((corner) => (
+        <span
+          key={corner}
+          aria-hidden="true"
+          className={`frame-corner-mark ${corner}`}
+        />
+      ))}
+    </Modal>
   );
 }
 

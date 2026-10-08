@@ -7,7 +7,7 @@ const { native, forbiddenFetch } = vi.hoisted(() => ({ native: vi.fn(), forbidde
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native }));
 vi.mock("@storyteller/api", () => { throw new Error("Authentication UI must not import API clients"); });
 vi.mock("@storyteller/tauri-utils", () => ({ FetchProxy: forbiddenFetch }));
-vi.mock("@headlessui/react", () => ({ Transition: ({ show, children }: any) => show ? children : null, TransitionChild: ({ children }: any) => children }));
+vi.mock("@storyteller/ui-modal", () => ({ Modal: ({ isOpen, children }: any) => isOpen ? children : null }));
 vi.mock("@storyteller/icons", () => ({ DynamicIcon: () => null, DiscordIcon: () => null }));
 vi.mock("@storyteller/ui-button", () => ({ Button: ({ children, variant, icon, iconFlip, ...props }: any) => <button {...props}>{children}</button> }));
 vi.mock("@storyteller/ui-input", () => ({ Input: ({ inputClassName, ...props }: any) => <input {...props} /> }));
@@ -42,6 +42,40 @@ afterEach(() => {
 });
 
 describe("native login modal integration", () => {
+  it.each([false, true])("keeps startup usable without an account (session failure: %s)", async (fails) => {
+    useLoginModalStore.setState({ isOpen: false });
+    if (fails) native.mockRejectedValueOnce(new Error("Offline"));
+    await act(async () => { render(<LoginModal />); });
+    expect(useLoginModalStore.getState().isOpen).toBe(false);
+    expect(screen.queryByText("Create your account")).toBeNull();
+
+    await act(async () => { useLoginModalStore.getState().openModal(); });
+    expect(screen.getByText("Create your account")).toBeTruthy();
+  });
+
+  it("does not reopen a dismissed login when a pending session check finishes", async () => {
+    let resolveSession: (value: unknown) => void = () => {};
+    native.mockImplementationOnce(() => new Promise((resolve) => { resolveSession = resolve; }));
+    await act(async () => { render(<LoginModal />); });
+    fireEvent.click(screen.getByRole("button", { name: "Close login" }));
+    await act(async () => { resolveSession(null); });
+    expect(useLoginModalStore.getState().isOpen).toBe(false);
+    expect(screen.queryByText("Create your account")).toBeNull();
+  });
+
+  it("cancels website login on dismissal and allows a fresh login afterward", async () => {
+    const success = vi.fn();
+    await act(async () => { render(<LoginModal isSignUp={false} onArtCraftAuthSuccess={success} />); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Scan to Login" })); });
+    fireEvent.click(screen.getByRole("button", { name: "Close login" }));
+    expect(native).toHaveBeenCalledWith("storyteller_cancel_login_challenge_command", { challengeId: "native_handle" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(success).not.toHaveBeenCalled();
+    await act(async () => { useLoginModalStore.getState().triggerRecheck(); });
+    expect(screen.getByPlaceholderText("Min. 8 characters")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Scan to Login" })).toBeTruthy();
+  });
+
   it("shows website and QR login only on the login screen", async () => {
     await act(async () => { render(<LoginModal />); });
     expect(screen.getByText("Create your account")).toBeTruthy();

@@ -3,10 +3,13 @@ import { Switch } from "@storyteller/ui-switch";
 import { useEnterToGenerateStore } from "@storyteller/ui-promptbox";
 import { useModelPickerStyleStore } from "@storyteller/ui-popover";
 import { useKeybindsStore } from "@storyteller/keybinds";
+import { useBillingPreferencesStore } from "../billing-preferences-store";
 
 interface MiscSettingsPaneProps {}
 
 export const MiscSettingsPane = (args: MiscSettingsPaneProps) => {
+  const showBillingShortcuts = useBillingPreferencesStore((s) => s.showBillingShortcuts);
+  const setShowBillingShortcuts = useBillingPreferencesStore((s) => s.setShowBillingShortcuts);
   const enterToGenerate = useEnterToGenerateStore((s) => s.enabled);
   const setEnterToGenerate = useEnterToGenerateStore((s) => s.setEnabled);
 
@@ -18,6 +21,22 @@ export const MiscSettingsPane = (args: MiscSettingsPaneProps) => {
 
   return (
     <div className="space-y-4 text-base-fg">
+      <div className="flex flex-col gap-2 pt-3">
+        <div className="flex flex-col gap-0.5">
+          <Label htmlFor="billing-shortcuts">Show billing shortcuts</Label>
+          <p className="text-xs opacity-70">
+            Show credits, upgrade shortcuts, and ArtCraft plan suggestions.
+            Off by default. You can always support ArtCraft and manage paid
+            services in Plan &amp; Credits.
+          </p>
+        </div>
+        <Switch
+          id="billing-shortcuts"
+          label="Show billing shortcuts"
+          enabled={showBillingShortcuts}
+          setEnabled={setShowBillingShortcuts}
+        />
+      </div>
       <div className="flex flex-col gap-2 pt-3">
         <div className="flex flex-col gap-0.5">
           <Label htmlFor="enter-to-generate">Enter to generate</Label>

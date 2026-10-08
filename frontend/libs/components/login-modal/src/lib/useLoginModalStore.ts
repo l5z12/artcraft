@@ -11,8 +11,9 @@ interface LoginModalStore {
 export const useLoginModalStore = create<LoginModalStore>((set) => ({
   isOpen: false,
   recheckTrigger: 0,
-  openModal: () => set({ isOpen: true }),
+  openModal: () =>
+    set((state) => ({ isOpen: true, recheckTrigger: state.recheckTrigger + 1 })),
   closeModal: () => set({ isOpen: false }),
   triggerRecheck: () =>
-    set((state) => ({ recheckTrigger: state.recheckTrigger + 1 })),
+    set((state) => ({ isOpen: true, recheckTrigger: state.recheckTrigger + 1 })),
 }));
