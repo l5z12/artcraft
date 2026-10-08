@@ -26,6 +26,7 @@ import {
   seekTimeline,
 } from "../actions/timeline";
 import { captureStill, recordVideo } from "../actions/recordOutput";
+import { openLocalScene, saveLocalScene } from "../actions/localScene";
 
 // One declarative table mapping viewport actions to their handlers. The actual
 // key bindings now come from the unified @storyteller/keybinds registry (preset
@@ -219,6 +220,8 @@ const timelineDeleteSelected = (editor: Editor) => {
 // Action id → handler. Bindings live in the keybinds registry; this maps each
 // registered PageScene action to what it actually does.
 const HANDLERS: Record<ActionId, (editor: Editor) => void | Promise<void>> = {
+  "pagescene.file.openLocal": openLocalScene,
+  "pagescene.file.saveLocal": saveLocalScene,
   "pagescene.transform.grab": (e) => e.beginModalTransform("translate"),
   "pagescene.transform.translate": (e) => setGizmoMode(e, "translate", "move"),
   "pagescene.transform.rotate": (e) => setGizmoMode(e, "rotate", "rotate"),

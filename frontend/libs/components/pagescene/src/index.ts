@@ -1,4 +1,5 @@
 // Public API for @storyteller/ui-pagescene.
+export { createLocalSceneFile, parseLocalSceneFile } from "./lib/localSceneFile";
 
 // Top-level component — the host mounts this inside its route/tab.
 export { Stage3D } from "./lib/Stage3D";

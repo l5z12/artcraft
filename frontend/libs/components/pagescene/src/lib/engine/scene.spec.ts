@@ -17,6 +17,29 @@ vi.mock("three/examples/jsm/Addons.js", async () => {
   return { MMDAnimationHelper: class {}, Water: class extends Mesh {} };
 });
 
+describe("embedded scene assets", () => {
+  it("resolves local models and animation clips without contacting a media service", async () => {
+    const scene = makeScene();
+    scene.embeddedAssets = { m_model: "data:model/gltf-binary;base64,AQID", m_animation: "data:model/gltf-binary;base64,BAUG" };
+    await scene.warmMediaURLs(["m_model", "m_animation"]);
+    expect(await scene.getMediaURL("m_model")).toBe(scene.embeddedAssets.m_model);
+    expect(await scene.getMediaURL("m_animation")).toBe(scene.embeddedAssets.m_animation);
+  });
+
+  it("loads an image plane from its embedded URL without adding a query to the data URL", async () => {
+    const scene = makeScene();
+    scene.embeddedAssets = { "https://example.test/image.png": "data:image/png;base64,AQID" };
+    const load = vi.spyOn(THREE.TextureLoader.prototype, "loadAsync").mockResolvedValue(new THREE.Texture());
+    try {
+      const object = await scene.instantiate("Image::https://example.test/image.png");
+      expect(load).toHaveBeenCalledWith("data:image/png;base64,AQID");
+      expect(object.userData.media_id).toBe("Image::https://example.test/image.png");
+    } finally {
+      load.mockRestore();
+    }
+  });
+});
+
 describe("Scene disposal", () => {
   describe("disposeObject", () => {
     it("frees the object's GPU resources", () => {

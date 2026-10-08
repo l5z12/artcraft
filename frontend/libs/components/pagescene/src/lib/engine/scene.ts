@@ -10,6 +10,7 @@ import { MediaFileType } from "../enums";
 import { ChromaKeyMaterial } from "./chromakey";
 import { InfiniteGridHelper } from "./InfiniteGridHelper";
 import type { Camera } from "@storyteller/common";
+import { WATER_NORMALS_URL } from "../localSceneFile";
 import toast from "react-hot-toast";
 import { SplatMesh } from "@sparkjsdev/spark";
 import { ensureInternalBbox } from "./internalBbox";
@@ -48,6 +49,8 @@ export type SceneDeps = {
 };
 
 class Scene {
+  // Original media token/URL -> embedded data URL, retained in tab snapshots.
+  embeddedAssets: Record<string, string> = {};
   name: string;
   gridHelper: InfiniteGridHelper | undefined;
   groundPlane: THREE.Mesh | undefined;
@@ -138,6 +141,7 @@ class Scene {
   }
 
   clear() {
+    this.embeddedAssets = {};
     this.disposeContents();
     this._createGrid();
     this._create_base_lighting();
@@ -227,7 +231,7 @@ class Scene {
         textureWidth: 1024,
         textureHeight: 1024,
         waterNormals: new THREE.TextureLoader().load(
-          "https://threejs.org/examples/textures/waternormals.jpg",
+          this.embeddedAssets[WATER_NORMALS_URL] ?? WATER_NORMALS_URL,
           function (texture) {
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
           },
@@ -246,11 +250,12 @@ class Scene {
       this.shader_objects.push(obj);
       obj.userData["media_id"] = "Parim";
     } else if (name.includes("Image::")) {
-      const image_token = name.replace("Image::", "");
+      const sourceUrl = name.replace("Image::", "");
+      const image_token = this.embeddedAssets[sourceUrl] ?? sourceUrl;
       let texture;
 
-      if (image_token.includes(".mp4")) {
-        const Video_token = name.replace("Image::", "");
+      if (image_token.includes(".mp4") || image_token.startsWith("data:video/")) {
+        const Video_token = image_token;
         const videoElement = document.createElement("video");
         videoElement.controls = true;
         videoElement.muted = true;
@@ -284,8 +289,12 @@ class Scene {
         // the "sec-fetch-mode: no-cors" header. On Safari (Mac), this is cached and makes the image
         // permanently impossible to use in Three.js. We bypass this by appending a query parameter
         // to the URL.
-        const modifiedUrl = image_token + "?threejs=true";
-        texture = loader.load(modifiedUrl);
+        const modifiedUrl = /^(data:|blob:)/.test(image_token)
+          ? image_token
+          : image_token + (image_token.includes("?") ? "&" : "?") + "threejs=true";
+        texture = image_token.startsWith("data:")
+          ? await loader.loadAsync(modifiedUrl)
+          : loader.load(modifiedUrl);
         texture.colorSpace = THREE.SRGBColorSpace;
         const image_material = new THREE.MeshBasicMaterial({
           color: 0xffffff,
@@ -568,6 +577,7 @@ class Scene {
   // cache first (populated by warmMediaURLs during a scene load) before
   // falling back to a single-token metadata fetch.
   async getMediaURL(media_id: string) {
+    if (Object.hasOwn(this.embeddedAssets, media_id)) return this.embeddedAssets[media_id];
     const cached = this.mediaUrlCache.get(media_id);
     if (cached !== undefined) return cached;
     return this.deps.getMediaUrlByToken(media_id);
@@ -579,7 +589,8 @@ class Scene {
   // was deleted) silently fall through to the per-asset fetch path.
   async warmMediaURLs(tokens: string[]): Promise<void> {
     if (tokens.length === 0) return;
-    const unique = Array.from(new Set(tokens));
+    const unique = Array.from(new Set(tokens)).filter((id) => !Object.hasOwn(this.embeddedAssets, id));
+    if (unique.length === 0) return;
     if (this.deps.getMediaUrlsByTokens) {
       const urls = await this.deps.getMediaUrlsByTokens(unique);
       for (const [token, url] of Object.entries(urls)) {
@@ -711,11 +722,14 @@ class Scene {
       url.includes(".png") ||
       url.includes(".jpg") ||
       url.includes(".jpeg") ||
-      url.includes(".mp4")
+      url.includes(".webp") ||
+      url.includes(".gif") ||
+      url.includes(".mp4") ||
+      /^data:(image\/|video\/)/.test(url)
     ) {
       const obj = await this.instantiate("Image::" + url);
       obj.position.copy(position);
-      if (url.includes(".mp4")) {
+      if (url.includes(".mp4") || url.startsWith("data:video/")) {
         obj.userData["media_file_type"] = MediaFileType.Video;
       } else {
         obj.userData["media_file_type"] = MediaFileType.Image;
@@ -758,7 +772,7 @@ class Scene {
         obj.userData["media_file_type"] = MediaFileType.Image;
       }
       return obj;
-    } else if (url.includes(".spz")) {
+    } else if (url.includes(".spz") || url.startsWith("data:application/x-spz;")) {
       return await this.loadSplatWithPlaceholder(
         media_id,
         name,
@@ -1032,7 +1046,7 @@ class Scene {
         // Host-supplied CORS-bypassed binary fetch (FetchProxy under
         // Tauri; plain fetch under web hosts that allow it).
         buffer = await (
-          await this.deps.fetchAsset(media_url, { signal })
+          await this.fetchSceneAsset(media_url, { signal })
         ).arrayBuffer();
       } catch (error) {
         if ((error as { name?: string })?.name !== "AbortError") {
@@ -1074,7 +1088,7 @@ class Scene {
         // Host-supplied CORS-bypassed binary fetch (FetchProxy under
         // Tauri; plain fetch under web hosts that allow it).
         buffer = await (
-          await this.deps.fetchAsset(media_url, { signal })
+          await this.fetchSceneAsset(media_url, { signal })
         ).arrayBuffer();
       } catch (error) {
         if ((error as { name?: string })?.name !== "AbortError") {
@@ -1084,13 +1098,14 @@ class Scene {
         return;
       }
 
-      new SplatMesh({
+      const mesh = new SplatMesh({
         fileBytes: buffer,
         onLoad: (mesh) => {
           resolve(mesh);
           onComplete();
         },
       });
+      mesh.initialized.catch(reject);
     });
   }
 
@@ -1117,6 +1132,10 @@ class Scene {
         },
       );
     });
+  }
+
+  private fetchSceneAsset(url: string, init?: { signal?: AbortSignal }): Promise<Response> {
+    return url.startsWith("data:") ? fetch(url, init) : this.deps.fetchAsset(url, init);
   }
 
   // This allows to wait for Ammo to fully load.

@@ -103,6 +103,8 @@ const defs: ActionDef[] = [
   act("pagescene.view.toggleGrid", "Toggle grid", "View"),
   act("pagescene.edit.undo", "Undo", "History", { important: true, preventDefault: true, when: inBuild }),
   act("pagescene.edit.redo", "Redo", "History", { important: true, preventDefault: true, when: inBuild }),
+  act("pagescene.file.openLocal", "Open local scene", "Edit", { preventDefault: true, when: inBuild }),
+  act("pagescene.file.saveLocal", "Save local scene", "Edit", { preventDefault: true, when: inBuild }),
   act("pagescene.edit.copy", "Copy", "Edit", { preventDefault: true, when: inBuild }),
   act("pagescene.edit.paste", "Paste", "Edit", { preventDefault: true, when: inBuild }),
 

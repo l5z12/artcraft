@@ -15,6 +15,8 @@ import {
   LoadWithoutCors,
 } from "@storyteller/tauri-api";
 import { FetchProxy } from "@storyteller/tauri-utils";
+import { toast } from "@storyteller/ui-toaster";
+import { useLoginModalStore } from "@storyteller/ui-login-modal";
 import {
   MediaFilesApi,
   StorytellerApiHostStore,
@@ -35,13 +37,13 @@ import { uploadPlaneFromMediaToken as hostUploadPlaneFromMediaToken } from "~/co
 import { useTabStore } from "~/pages/Stores/TabState";
 import { setLogoutStates } from "~/signals/authentication/utilities";
 import {
-  addToast,
   authentication,
   pageHeight,
   pageWidth,
   signalScene,
 } from "~/signals";
 import { sceneOutputAdapter } from "./sceneOutputAdapter";
+import { withLocalSceneFiles } from "./localSceneAdapter";
 
 const apiHost = () =>
   StorytellerApiHostStore.getInstance().getApiSchemeAndHost();
@@ -167,7 +169,7 @@ export const useTauriPageSceneAdapter = (
 ): PageSceneAdapter => {
   const { initialSceneToken, cacheJsonString, onSceneSerialized } = options;
   return useMemo<PageSceneAdapter>(
-    () => ({
+    () => withLocalSceneFiles({
       ...sceneOutputAdapter,
       enqueueGeneration: async (req) => {
         const request: GenerateImageRequest = {
@@ -291,8 +293,12 @@ export const useTauriPageSceneAdapter = (
         };
       },
 
-      showToast: (level: ToastTypes, message: string) =>
-        addToast(level, message),
+      showToast: (level: ToastTypes, message: string) => {
+        if (level === ToastTypes.SUCCESS) toast.success(message);
+        else if (level === ToastTypes.ERROR) toast.error(message);
+        else toast(message);
+      },
+      promptSignup: () => useLoginModalStore.getState().openModal(),
 
       getMediaUrlByToken: async (token) => {
         const mediaFilesApi = new MediaFilesApi();

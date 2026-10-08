@@ -922,10 +922,11 @@ class Editor {
   // JSON-string deserialization path used on initial mount.
   public async applyJson(jsonString: string) {
     const result = await this.save_manager.loadCache(jsonString);
-    if (!result.applied) return;
+    if (!result.applied) return false;
     this.history.clear();
     this.bus.emit(new SceneResetEvent());
     this.selection.refreshOutliner();
+    return true;
   }
 
   public async saveScene({

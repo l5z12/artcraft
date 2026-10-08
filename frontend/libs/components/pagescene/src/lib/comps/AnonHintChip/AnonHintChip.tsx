@@ -11,7 +11,7 @@ export const AnonHintChip = () => {
   const editor = useContext(EngineContext);
   const currentUserToken = usePageSceneStore((s) => s.currentUserToken);
 
-  if (currentUserToken) return null;
+  if (currentUserToken || editor?.adapter.saveLocalScene) return null;
 
   const handleClick = () => {
     editor?.adapter.promptSignup?.("hint");

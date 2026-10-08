@@ -28,6 +28,8 @@ use crate::core::commands::generate::generate_video::generate_video_command::gen
 use crate::core::commands::flip_image::flip_image;
 use crate::core::commands::get_app_info_command::get_app_info_command;
 use crate::core::commands::load_without_cors_command::load_without_cors_command;
+use crate::core::commands::scene_files::open_local_scene_command::open_local_scene_command;
+use crate::core::commands::scene_files::save_local_scene_command::save_local_scene_command;
 use crate::core::commands::media_files::media_file_delete_command::media_file_delete_command;
 use crate::core::commands::platform_info_command::platform_info_command;
 use crate::core::commands::providers::deprecated::get_provider_order_command::get_provider_order_command;
@@ -257,6 +259,8 @@ pub fn run() {
     grok_get_credential_info_command,
     grok_open_login_command,
     load_without_cors_command,
+    open_local_scene_command,
+    save_local_scene_command,
     mark_task_as_dismissed_command,
     media_file_delete_command,
     midjourney_clear_credentials_command,

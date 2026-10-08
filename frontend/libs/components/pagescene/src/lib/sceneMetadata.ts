@@ -3,7 +3,7 @@
 // from the store directly — engine code stays store-agnostic.
 
 import { SceneGenereationMetaData as SceneGenerationMetaData } from "./models/sceneGenerationMetadata";
-import Editor from "./engine/editor";
+import type Editor from "./engine/editor";
 import { usePageSceneStore } from "./PageSceneStore";
 
 export const getSceneGenerationMetaData = (

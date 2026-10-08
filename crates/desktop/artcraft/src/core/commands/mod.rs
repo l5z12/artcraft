@@ -11,5 +11,6 @@ pub mod media_files;
 pub mod platform_info_command;
 pub mod providers;
 pub mod response;
+pub mod scene_files;
 pub mod task_queue;
 pub mod deprecated;

@@ -191,6 +191,9 @@ export class SaveManager {
     return {
       version,
       scene: scene_json,
+      ...(Object.keys(scene.embeddedAssets ?? {}).length > 0
+        ? { embeddedAssets: scene.embeddedAssets }
+        : {}),
       ...sceneGenerationMetadata,
       timeline,
       skybox: scene.skybox,
@@ -286,11 +289,13 @@ export class SaveManager {
     const scene = this.deps.getActiveScene();
     const proxyScene = new StoryTellerProxyScene(version, scene);
 
+    scene.embeddedAssets = scene_json.embeddedAssets ?? {};
     await proxyScene.loadFromSceneJson(
       scene_json["scene"],
       scene_json["skybox"],
       scene_json["version"],
       ticket,
+      scene_json.embeddedAssets !== undefined,
     );
     if (ticket.cancelled) return false;
 
@@ -321,9 +326,7 @@ export class SaveManager {
       );
     }
 
-    if (scene_json.positivePrompt) {
-      this.deps.setPositivePrompt(scene_json.positivePrompt);
-    }
+    this.deps.setPositivePrompt(scene_json.positivePrompt ?? "");
     if (scene_json.cameraAspectRatio) {
       this.deps.changeRenderCameraAspectRatio(scene_json.cameraAspectRatio);
       this.deps.bus.emit(

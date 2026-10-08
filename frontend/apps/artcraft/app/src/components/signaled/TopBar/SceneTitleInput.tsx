@@ -16,7 +16,7 @@ export const SceneTitleInput = ({ pageName }: Props) => {
   const { userInfo } = authentication;
   const [showInput, setShowInput] = useState(false);
   const [previousTitle, setPreviousTitle] = useState(scene.value.title);
-  const isSceneOwner = scene.value.ownerToken === userInfo.value?.user_token;
+  const isSceneOwner = !scene.value.token || scene.value.ownerToken === userInfo.value?.user_token;
 
   const [{ isValid, isSaving }, setState] = useState<{
     isValid: boolean;

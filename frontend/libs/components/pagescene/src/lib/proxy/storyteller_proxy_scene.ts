@@ -125,6 +125,7 @@ export class StoryTellerProxyScene {
     skybox_media_id: string,
     version: number,
     ticket?: LoadTicket,
+    strict = false,
   ) {
     if (scene_json == null || this.scene == null) return;
 
@@ -232,6 +233,10 @@ export class StoryTellerProxyScene {
     if (ticket?.cancelled) {
       this.discardLoadedObjects(settled);
       return;
+    }
+    if (strict && settled.some((result) => result.status === "rejected")) {
+      this.discardLoadedObjects(settled);
+      throw new Error("An embedded scene asset could not be loaded.");
     }
 
     // Synchronous transform-application pass. We walk results in

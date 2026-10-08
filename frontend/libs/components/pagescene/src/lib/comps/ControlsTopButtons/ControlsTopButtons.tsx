@@ -3,7 +3,7 @@ import { FileIcon, KeyboardIcon, SquareCheckIcon, SquareIcon } from "lucide-reac
 import { ButtonDropdown } from "@storyteller/ui-button-dropdown";
 import { Input } from "@storyteller/ui-input";
 import { Button } from "@storyteller/ui-button";
-import { useCheatsheetPin } from "@storyteller/keybinds";
+import { formatBindings, useCheatsheetPin, useResolvedKeybinds } from "@storyteller/keybinds";
 import { twMerge } from "tailwind-merge";
 
 import { EngineContext } from "../../contexts/EngineContext/EngineContext";
@@ -14,6 +14,7 @@ import {
 import { DEFAULT_CAMERA_ASPECT_RATIO, ToastTypes } from "../../enums";
 import { getSceneGenerationMetaData } from "../../sceneMetadata";
 import { LoadUserScenes } from "./LoadUserScenes";
+import { openLocalScene, saveLocalScene } from "../../actions/localScene";
 
 import { TOOLBAR_BUTTON_CLASS_NAME } from "../toolbarStyles";
 
@@ -21,12 +22,16 @@ const isNumberString = (s: string): boolean => /^\d+$/.test(s);
 
 export const ControlsTopButtons = () => {
   const editor = useContext(EngineContext);
+  const { forAction } = useResolvedKeybinds();
   const cheatsheetPinned = useCheatsheetPin((s) => s.pinned);
   const toggleCheatsheet = useCheatsheetPin((s) => s.togglePinned);
 
   const sceneMeta = usePageSceneStore((s) => s.sceneMeta);
   const currentUserToken = usePageSceneStore((s) => s.currentUserToken);
   const outlinerShowing = usePageSceneStore((s) => s.outlinerShowing);
+  const localFilesDisabled = usePageSceneStore((s) =>
+    s.editorLoader.isShowing || s.recordingProgress !== null || s.sceneMode !== "build",
+  );
   const isVisitingOthersScene = useIsVisitingOthersScene();
 
   const [sceneTitleInput, setSceneTitleInput] = useState<string>(
@@ -281,9 +286,21 @@ export const ControlsTopButtons = () => {
                     },
                   }),
             },
+            ...(editor?.adapter.openLocalScene ? [{
+              label: "Open local scene…",
+              description: formatBindings(forAction("pagescene.file.openLocal")),
+              disabled: localFilesDisabled,
+              onClick: () => openLocalScene(editor),
+            }] : []),
+            ...(editor?.adapter.saveLocalScene ? [{
+              label: "Save local scene…",
+              description: formatBindings(forAction("pagescene.file.saveLocal")),
+              disabled: localFilesDisabled,
+              onClick: () => saveLocalScene(editor),
+              divider: true,
+            }] : []),
             {
-              label: "Load my scene",
-              description: "Ctrl+O",
+              label: "Open cloud scene…",
               ...(currentUserToken
                 ? {
                     dialogProps: {
@@ -313,8 +330,7 @@ export const ControlsTopButtons = () => {
             // that branch.
             {
               disabled: !canSave,
-              label: isVisitingOthersScene ? "Save copy" : "Save scene",
-              description: "Ctrl+S",
+              label: isVisitingOthersScene ? "Save cloud copy" : "Save to cloud",
               ...(!currentUserToken
                 ? {
                     onClick: () => editor?.adapter.promptSignup?.("save"),
@@ -337,7 +353,7 @@ export const ControlsTopButtons = () => {
               : [
                   {
                     disabled: !currentUserToken || !sceneMeta.token,
-                    label: "Save scene as copy",
+                    label: "Save cloud scene as copy",
                     onDialogOpen: bumpCopyCountInTitle,
                     dialogProps: saveAsCopyDialogProps,
                   },

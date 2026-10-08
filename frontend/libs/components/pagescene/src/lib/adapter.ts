@@ -117,6 +117,13 @@ export interface PageSceneAdapter {
   // plumbing.
   saveScene(payload: PageSceneSavePayload): Promise<string>;
   loadScene(token: string): Promise<unknown>;
+  // Optional desktop file I/O. Local files include the scene's assets; a
+  // cancelled picker returns false/null and never changes the document.
+  saveLocalScene?(payload: {
+    saveJson: string;
+    sceneTitle: string;
+  }): Promise<boolean>;
+  openLocalScene?(): Promise<{ saveJson: string; sceneTitle: string } | null>;
   // Wraps Tauri-flavored CORS-bypassed fetches. Used by Scene's GLTF
   // loader paths that resolve CDN URLs the browser can't fetch directly.
   // Accepts an optional AbortSignal so the scene loader can cancel
@@ -283,8 +290,7 @@ export interface PageSceneAdapter {
 
   // Open the host's signup/login modal. Called when an anonymous
   // visitor clicks a feature that requires an account (Save, Generate,
-  // Upload, "My Library"). Tauri host leaves it undefined — its user
-  // is always signed in. Webapp host wires this to its auth modal.
+  // Upload, "My Library"). Hosts wire this to their optional login modal.
   promptSignup?(reason?: string): void;
 
   // Open the host's New-Scene chooser (e.g. webapp's splash modal). When

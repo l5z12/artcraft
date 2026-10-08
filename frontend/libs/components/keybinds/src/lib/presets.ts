@@ -42,6 +42,8 @@ export const BASE_BINDINGS: Record<ActionId, Binding[]> = {
   "pagescene.view.toggleGrid": [b("KeyH")],
   "pagescene.edit.undo": [b("KeyZ", { ctrl: true })],
   "pagescene.edit.redo": [b("KeyZ", { ctrl: true, shift: true }), b("KeyY", { ctrl: true })],
+  "pagescene.file.openLocal": [b("KeyO", { ctrl: true })],
+  "pagescene.file.saveLocal": [b("KeyS", { ctrl: true })],
   "pagescene.edit.copy": [b("KeyC", { ctrl: true })],
   "pagescene.edit.paste": [b("KeyV", { ctrl: true })],
 
